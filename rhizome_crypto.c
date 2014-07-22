@@ -661,3 +661,91 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
 
   return 1;
 }
+
+//is there already a struct for this somewhere?
+struct sid_identity{
+	unsigned char sid_private[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES];
+	unsigned char sid_public[crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES];
+	unsigned char sign_private[crypto_sign_edwards25519sha512batch_SECRETKEYBYTES];
+	rhizome_bid_t sign_public;
+};
+
+/* generate a serval identity deterministically from a given seed string */
+static int generate_identity(const char *seed, struct sid_identity *identity)
+{
+	unsigned char hash[crypto_hash_sha512_BYTES];
+	crypto_hash_sha512(hash, (unsigned char *)seed, strlen(seed));
+
+	// The first 256 bits (32 bytes) of the hash will be used as the private key of the BID.
+	bcopy(hash, identity->sign_private, sizeof identity->sign_private);
+	if (crypto_sign_compute_public_key(identity->sign_private, identity->sign_public.binary) == -1)
+		return WHY("Could not generate public signing key");
+	// The last 32 bytes of the private key should be identical to the public key.  This is what
+	// crypto_sign_edwards25519sha512batch_keypair() returns, and there is code that depends on it.
+	// TODO: Refactor the Rhizome private/public keypair to eliminate this duplication.
+	bcopy(identity->sign_public.binary, identity->sign_private + RHIZOME_BUNDLE_KEY_BYTES, sizeof identity->sign_public.binary);
+	
+	// The last 256 bits (32 bytes) of the hash will be used as the private key of the SID.
+	bcopy(hash + 32, identity->sid_private, sizeof identity->sign_private);
+	if (_derive_scalarmult_public(identity->sign_public, identity->sign_private) != 0)
+		return WHY("Could not generate public key");
+	//bcopy(identity->sid_public.binary, identity->sign_private+ sizeof(identity->sign_private) - 32, sizeof identity->sid_public.binary);
+
+	return 0;
+}
+
+/* Conceal the sender of a rhizome bundle by generating a random SID for the sender
+ * and including the real sender value encrypted in a special manifest field.
+ * TODO: Get receiver and sender from manifest?
+ */
+int rhizome_manifest_conceal_sender(rhizome_manifest *m, sid_t *sender, sid_t *receiver, keyring_file *k)
+{
+  
+  //Do I need to encrypt just the manifest sender or the actual packet one?
+  //i.e. does the packet sender match the rhizome one always or does this change as packets pass through nodes?
+  // If it doesn't change than nodes can just infer real sender and encrypting sender in manifest is useless?
+
+  unsigned char *nm_bytes = NULL;
+  unsigned char auth_hash[crypto_hash_sha512_BYTES];
+  unsigned char id_hash[crypto_hash_sha512_BYTES];
+  unsigned char *salt = NULL;
+  sid_identity *identity = NULL;
+  char seed[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 +1]; // 6 for "sender" + 1 for null byte
+
+  //roll identity here... currently unsure how to seed. Should I store in keyring so as to cache, or just generate every time?
+  //look at generate_keypair() function, but instead make one for crypto_box_curve25519xsalsa20poly1305 as this is used for SID's
+  //keyring_identity *fsidtx = keyring_create_identity(k, k->contexts[0], NULL);
+ 
+
+  //taken from meshms.c get_my_conversation_bundle()
+  /* Find our private key */
+  unsigned cn = 0, in = 0, kp = 0;
+  if (!keyring_find_sid(keyring, &cn, &in, &kp, sender))
+	  return MESHMS_STATUS_SID_LOCKED;
+  snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), receiver);
+  generate_identity(seed, identity);
+
+  /* Generate authenticaiton info for RSIDRX */
+
+  /* Generate shared secret and store http://stackoverflow.com/questions/13663604/questions-about-the-nacl-crypto-library */
+  nm_bytes = keyring_get_nm_bytes(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, receiver);
+  assert(nm_bytes != NULL)
+  //fsidtx_public + Bundle ID + "auth"
+  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(identity->sid_public, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
+  crypto_hash_sha512(auth_hash, nm_bytes + salt, sizeof(nm_bytes + salt));
+  //place into new manifest field here
+
+  /* Generate ID info for RSIDRX */
+  nm_bytes = keyring_get_nm_bytes(identity->sid_private, receiver);
+  assert(nm_bytes != NULL);
+  snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(identity->sid_public, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));   //fsidtx_public + Bundle ID + "id"
+  crypto_hash_sha512(id_hash, nm_bytes + salt, sizeof(nm_bytes + salt));
+
+  /* Encrypt RSIDTX using FSIDTX */
+  unsigned char rsidtx_ciphered;
+  crypto_box_curve25519xsalsa20poly1305_afternm(rsidtx_ciphered, sender,)
+  
+  for(int i=0;i<SID_SIZE;i++) {
+    sender->binary[i] //binary is an array of chars the size of SID_SIZE
+  }
+}
