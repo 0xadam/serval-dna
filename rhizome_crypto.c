@@ -703,7 +703,7 @@ void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
   unsigned char *nm_bytes = NULL;
   unsigned char auth_hash[crypto_hash_sha512_BYTES];
   unsigned char id_hash[crypto_hash_sha512_BYTES];
-  char salt[67];
+  char salt[69]; //32 + 32 + 4 + 1
   struct sid_identity *identity = NULL;
   char seed[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
 
@@ -751,4 +751,3 @@ void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
   }
 	DEBUGF("Encrypted Serval ID = %s", alloca_tohex_sid_t(crypted_sid));
 }
-
