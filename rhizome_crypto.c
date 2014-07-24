@@ -707,6 +707,12 @@ int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, keyring_file *key
   struct sid_identity *identity = NULL;
   char seed[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
 
+
+  if (!m->has_recipient)
+  {
+    WHY("Cannot set concealed sender as recipient is not set");
+    return 1;
+  }
   //roll identity here... currently unsure how to seed. Should I store in keyring so as to cache, or just generate every time?
   //look at generate_keypair() function, but instead make one for crypto_box_curve25519xsalsa20poly1305 as this is used for SID's
   //keyring_identity *fsidtx = keyring_create_identity(k, k->contexts[0], NULL);
