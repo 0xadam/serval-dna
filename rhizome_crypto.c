@@ -700,7 +700,7 @@ static int generate_identity(const char *seed, struct sid_identity *identity)
  */
 void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
 {
-  unsigned char *nm_bytes;
+  unsigned char *nm_bytes = NULL;
   unsigned char auth_hash[crypto_hash_sha512_BYTES];
   unsigned char id_hash[crypto_hash_sha512_BYTES];
   char salt[67];
@@ -724,15 +724,20 @@ void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
   /* Generate authenticaiton info for RSIDRX */
 
   /* Generate shared secret  http://stackoverflow.com/questions/13663604/questions-about-the-nacl-crypto-library */
-  nm_bytes = keyring_get_nm_bytes(&m->sender, &m->recipient);
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes, m->recipient.binary, keyring
+	  ->contexts[cn]
+	  ->identities[in]
+	  ->keypairs[kp]->private_key);
   assert(nm_bytes != NULL);
   //fsidtx_public + Bundle ID + "auth"
   snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(identity->sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
   bcopy(salt, nm_bytes + 32, strlen(salt)); //security issue using sizeof salt here? Should limit it somehow...
   crypto_hash_sha512(auth_hash, nm_bytes, sizeof(nm_bytes));
+  // The auth_hash should be stored in a manifest field here
+  nm_bytes = NULL;
 
   /* Generate ID info for RSIDRX */
-  nm_bytes = keyring_get_nm_bytes(&identity->sid_public, &m->recipient);
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes, m->recipient.binary, identity->sid_private);
   assert(nm_bytes != NULL);
   snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(identity->sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));   //fsidtx_public + Bundle ID + "id"
   bcopy(salt, nm_bytes + 32,  strlen(salt)); //security issue using sizeof salt here? Should limit it somehow...
@@ -746,3 +751,4 @@ void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
   }
 	DEBUGF("Encrypted Serval ID = %s", alloca_tohex_sid_t(crypted_sid));
 }
+
