@@ -32,6 +32,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "str.h"
 #include "strbuf.h"
 
+#include "serval.h"
+#include "keyring.h"
+
 #ifndef __RHIZOME_INLINE
 # if __GNUC__ && !__GNUC_STDC_INLINE__
 #  define __RHIZOME_INLINE extern inline
@@ -847,6 +850,8 @@ int rhizome_database_filehash_from_id(const rhizome_bid_t *bidp, uint64_t versio
 
 int overlay_mdp_service_rhizome_sync(struct internal_mdp_header *header, struct overlay_buffer *payload);
 void rhizome_sync_status();
+
+int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, keyring_file *keyring);
 
 DECLARE_ALARM(rhizome_fetch_status);
 #endif //__SERVAL_DNA__RHIZOME_H

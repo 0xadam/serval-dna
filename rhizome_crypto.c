@@ -671,7 +671,7 @@ struct sid_identity{
 } sid_identity;
 
 /* generate a serval identity deterministically from a given seed string */
-static int generate_identity(const char *seed, struct sid_identity *identity)
+int generate_identity(const char *seed, struct sid_identity *identity)
 {
 	unsigned char hash[crypto_hash_sha512_BYTES];
 	crypto_hash_sha512(hash, (unsigned char *)seed, strlen(seed));
@@ -698,7 +698,7 @@ static int generate_identity(const char *seed, struct sid_identity *identity)
  * and including the real sender value encrypted in a special manifest field.
  * TODO: Get receiver and sender from manifest?
  */
-void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
+int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, keyring_file *keyring)
 {
   unsigned char *nm_bytes = NULL;
   unsigned char auth_hash[crypto_hash_sha512_BYTES];
@@ -715,8 +715,7 @@ void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
   /* Find our private key */
   unsigned cn = 0, in = 0, kp = 0;
   if (!keyring_find_sid(keyring, &cn, &in, &kp, &m->sender))
-	  //return MESHMS_STATUS_SID_LOCKED;
-	  DEBUGF("SID LOCKED");
+	  return MESHMS_STATUS_SID_LOCKED;
 
   snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), alloca_tohex_sid_t(m->recipient));
   generate_identity(seed, identity); //need to store this identity in the keyring
@@ -750,4 +749,5 @@ void rhizome_manifest_conceal_sender(rhizome_manifest *m, keyring_file *keyring)
 		crypted_sid.binary[i] = id_hash[i] ^ m->sender.binary[i]; //binary is an array of chars the size of SID_SIZE
   }
 	DEBUGF("Encrypted Serval ID = %s", alloca_tohex_sid_t(crypted_sid));
+  return 0;
 }
