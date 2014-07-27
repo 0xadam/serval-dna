@@ -665,7 +665,6 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
 //is there already a struct for this somewhere?
 struct sid_identity{
 	unsigned char sid_private[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES];
-  unsigned char Private[crypto_sign_edwards25519sha512batch_SECRETKEYBYTES];
 	sid_t sid_public;
 	unsigned char sign_private[crypto_sign_edwards25519sha512batch_SECRETKEYBYTES];
 	unsigned char sign_public[crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES];
