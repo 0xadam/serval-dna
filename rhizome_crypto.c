@@ -665,6 +665,7 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
 //is there already a struct for this somewhere?
 struct sid_identity{
 	unsigned char sid_private[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES];
+  unsigned char Private[crypto_sign_edwards25519sha512batch_SECRETKEYBYTES];
 	sid_t sid_public;
 	unsigned char sign_private[crypto_sign_edwards25519sha512batch_SECRETKEYBYTES];
 	unsigned char sign_public[crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES];
@@ -673,13 +674,18 @@ struct sid_identity{
 /* generate a serval identity deterministically from a given seed string */
 int generate_identity(const char *seed, struct sid_identity *identity)
 {
+  
+  // The first 256 bits (32 bytes) of the hash will be used as the private key of the BID.
 	unsigned char hash[crypto_hash_sha512_BYTES];
 	crypto_hash_sha512(hash, (unsigned char *)seed, strlen(seed));
 
 	// The first 256 bits (32 bytes) of the hash will be used as the private key of the BID.
-	bcopy(hash, identity->sign_private, sizeof identity->sign_private);
+	bcopy(hash, identity->sid_private, sizeof identity->sid_private);
+
+
 	if (crypto_sign_compute_public_key(identity->sign_private, identity->sign_public) == -1)
 		return WHY("Could not generate public signing key");
+
 	// The last 32 bytes of the private key should be identical to the public key.  This is what
 	// crypto_sign_edwards25519sha512batch_keypair() returns, and there is code that depends on it.
 	// TODO: Refactor the Rhizome private/public keypair to eliminate this duplication.
@@ -698,21 +704,22 @@ int generate_identity(const char *seed, struct sid_identity *identity)
  * and including the real sender value encrypted in a special manifest field.
  * TODO: Get receiver and sender from manifest?
  */
-int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, keyring_file *keyring)
+int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *sender, keyring_file *keyring)
 {
-  unsigned char *nm_bytes = NULL;
+  unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
+  unsigned char nm_bytes_auth[1024];
   unsigned char auth_hash[crypto_hash_sha512_BYTES];
   unsigned char id_hash[crypto_hash_sha512_BYTES];
   char salt[69]; //32 + 32 + 4 + 1
-  struct sid_identity *identity = NULL;
-  char seed[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
-
-
+  struct sid_identity identity; //if this is a pointer initialised to null generate_identity crashes at the first bcopy
+  char seed[1 + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
+  //char seed[512];
   if (!m->has_recipient)
   {
-    WHY("Cannot set concealed sender as recipient is not set");
+    WHY("Cannot set concealed sender as recipient is not set"); //Need to handle in meshms.c... should I be asserting instead?
     return 1;
   }
+
   //roll identity here... currently unsure how to seed. Should I store in keyring so as to cache, or just generate every time?
   //look at generate_keypair() function, but instead make one for crypto_box_curve25519xsalsa20poly1305 as this is used for SID's
   //keyring_identity *fsidtx = keyring_create_identity(k, k->contexts[0], NULL);
@@ -720,40 +727,45 @@ int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, keyring_file *key
   //taken from meshms.c get_my_conversation_bundle()
   /* Find our private key */
   unsigned cn = 0, in = 0, kp = 0;
-  if (!keyring_find_sid(keyring, &cn, &in, &kp, &m->sender))
+  if (!keyring_find_sid(keyring, &cn, &in, &kp, sender))
 	  return MESHMS_STATUS_SID_LOCKED;
 
   snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), alloca_tohex_sid_t(m->recipient));
-  generate_identity(seed, identity); //need to store this identity in the keyring
+
+  generate_identity(seed, &identity); //need to store this identity in the keyring
+
+
 
   /* Generate authenticaiton info for RSIDRX */
 
   /* Generate shared secret  http://stackoverflow.com/questions/13663604/questions-about-the-nacl-crypto-library */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes, m->recipient.binary, keyring
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, m->recipient.binary, keyring
 	  ->contexts[cn]
 	  ->identities[in]
 	  ->keypairs[kp]->private_key);
-  assert(nm_bytes != NULL);
+
+  assert(nm_bytes_auth != NULL);
   //fsidtx_public + Bundle ID + "auth"
-  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(identity->sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
-  bcopy(salt, nm_bytes + 32, strlen(salt)); //security issue using sizeof salt here? Should limit it somehow...
-  crypto_hash_sha512(auth_hash, nm_bytes, sizeof(nm_bytes));
+  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
+  bcopy(salt, nm_bytes_auth + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_auth) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
+
+  crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth));
   // The auth_hash should be stored in a manifest field here
-  nm_bytes = NULL;
 
   /* Generate ID info for RSIDRX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes, m->recipient.binary, identity->sid_private);
-  assert(nm_bytes != NULL);
-  snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(identity->sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));   //fsidtx_public + Bundle ID + "id"
-  bcopy(salt, nm_bytes + 32,  strlen(salt)); //security issue using sizeof salt here? Should limit it somehow...
-  crypto_hash_sha512(id_hash, nm_bytes, sizeof(nm_bytes)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, m->recipient.binary, identity.sid_private);
+  assert(nm_bytes_id != NULL);
+  snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));   //fsidtx_public + Bundle ID + "id"
+  bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
+  crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
   /* Encrypt RSIDTX by XORing with ID shared secret */
   sid_t crypted_sid;
   unsigned i;
     for(i=0; i<SID_SIZE; i++) {
-		crypted_sid.binary[i] = id_hash[i] ^ m->sender.binary[i]; //binary is an array of chars the size of SID_SIZE
+		crypted_sid.binary[i] = id_hash[i] ^ sender->binary[i]; //binary is an array of chars the size of SID_SIZE
   }
 	DEBUGF("Encrypted Serval ID = %s", alloca_tohex_sid_t(crypted_sid));
+  rhizome_manifest_set_sender(m,&crypted_sid);
   return 0;
 }
