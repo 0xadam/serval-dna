@@ -732,7 +732,8 @@ int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *send
   snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), alloca_tohex_sid_t(m->recipient));
 
   generate_identity(seed, &identity); //need to store this identity in the keyring
-
+  rhizome_manifest_set_sender(m,&identity.sid_public);
+  DEBUGF("FSIDTX = %s", alloca_tohex_sid_t(identity.sid_public));
 
 
   /* Generate authenticaiton info for RSIDRX */
@@ -759,12 +760,71 @@ int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *send
   crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
   /* Encrypt RSIDTX by XORing with ID shared secret */
-  sid_t crypted_sid;
+  unsigned char crypted_sid[SID_SIZE];
   unsigned i;
     for(i=0; i<SID_SIZE; i++) {
-		crypted_sid.binary[i] = id_hash[i] ^ sender->binary[i]; //binary is an array of chars the size of SID_SIZE
+		crypted_sid[i] = id_hash[i] ^ sender->binary[i]; //binary is an array of chars the size of SID_SIZE
   }
-	DEBUGF("Encrypted Serval ID = %s", alloca_tohex_sid_t(crypted_sid));
-  rhizome_manifest_set_sender(m,&crypted_sid);
+	DEBUGF("Encrypted Serval ID = %s", crypted_sid);
+
+  return 0;
+}
+
+int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring)
+{
+
+  unsigned char id_hash[crypto_hash_sha512_BYTES]; //need to set these
+  unsigned char auth_hash[crypto_hash_sha512_BYTES];
+
+  unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
+  unsigned char nm_bytes_auth[1024];
+  char salt[69]; //32 + 32 + 4 + 1
+
+  /* Find our private key associated with our SID*/
+  unsigned cn = 0, in = 0, kp = 0;
+  if (!keyring_find_sid(keyring, &cn, &in, &kp, &m->sender))
+    return MESHMS_STATUS_SID_LOCKED;
+
+  /* Generate the shared secret with FSIDTX */
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, m->sender.binary, keyring
+    ->contexts[cn]
+    ->identities[in]
+    ->keypairs[kp]->private_key);
+
+  /* Generate id hash salt value */
+  snprintf(salt, sizeof(salt), "%s%sid",alloca_tohex(m->sender.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
+
+  /* Hash combined shared secret and salt and use to decrypt sid */
+  bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
+  crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
+
+  unsigned i;
+  unsigned char decrypted_sid[SID_SIZE];
+
+  for(i=0; i<SID_SIZE; i++) {
+    decrypted_sid[i] = id_hash[i] ^ m->sender_id_hash[i];
+  }
+
+  /* Check this is indeed the case, using the auth hash from the manifest */
+
+  /* Generate the shared secret with RSIDTX */
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, decrypted_sid, keyring
+    ->contexts[cn]
+    ->identities[in]
+    ->keypairs[kp]->private_key);
+
+  /* Generate the salt value */
+  snprintf(salt, sizeof(salt), "%s%sauth",alloca_tohex(m->sender.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
+
+  /* Hash combined shared secret and salt and use to authenticate decrypted sid */
+  bcopy(salt, nm_bytes_auth + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_auth) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES);
+  crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
+
+  //compare generated value to value stored in manifest here
+  if(bcmp(auth_hash, m->sender_auth_hash, crypto_hash_sha512_BYTES) != 0)
+  {
+    return -1; //TODO: Actually return an error code here
+  }
+
   return 0;
 }
