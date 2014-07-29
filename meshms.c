@@ -208,7 +208,7 @@ static int create_ply(const sid_t *my_sid, struct meshms_conversations *conv, rh
   rhizome_manifest_set_sender_concealed(m,my_sid, keyring);
   rhizome_manifest_set_filesize(m, 0);
   rhizome_manifest_set_tail(m, 0);
-  if (rhizome_fill_manifest(m, NULL, my_sid))
+  if (rhizome_fill_manifest(m, NULL, NULL))
     return -1;
   assert(m->haveSecret);
   assert(m->payloadEncryption == PAYLOAD_ENCRYPTED);
