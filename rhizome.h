@@ -215,11 +215,11 @@ typedef struct rhizome_manifest
   /* If sender is concealed this field is set.
   */
   bool_t is_sender_concealed;
-  /* The id has is the XOR'd shared secret and real identity.
+  /* The real sender field has is the XOR'd shared secret and real identity.
      The auth field is a hash allowing a recipient to authenticate sender.
    */
-  unsigned char sender_id_hash[crypto_hash_sha512_BYTES];
-  unsigned char sender_auth_hash[crypto_hash_sha512_BYTES];
+  unsigned char concealed_sender[SID_SIZE];
+  unsigned char concealed_sender_auth_hash[crypto_hash_sha512_BYTES];
 
   /* Local data, not encapsulated in the bundle.  The ROWID of the SQLite
    * MANIFESTS table row in which this manifest is stored.  Zero if the
@@ -260,28 +260,29 @@ typedef struct rhizome_manifest
  *
  * @author Andrew Bettison <andrew@servalproject.com>
  */
-#define rhizome_manifest_set_id(m,v)            _rhizome_manifest_set_id(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_version(m,v)       _rhizome_manifest_set_version(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_filesize(m,v)      _rhizome_manifest_set_filesize(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_filehash(m,v)      _rhizome_manifest_set_filehash(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_tail(m,v)          _rhizome_manifest_set_tail(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_bundle_key(m,v)    _rhizome_manifest_set_bundle_key(__WHENCE__,(m),(v))
-#define rhizome_manifest_del_bundle_key(m)      _rhizome_manifest_del_bundle_key(__WHENCE__,(m))
-#define rhizome_manifest_set_service(m,v)       _rhizome_manifest_set_service(__WHENCE__,(m),(v))
-#define rhizome_manifest_del_service(m)         _rhizome_manifest_del_service(__WHENCE__,(m))
-#define rhizome_manifest_set_name(m,v)          _rhizome_manifest_set_name(__WHENCE__,(m),(v))
-#define rhizome_manifest_del_name(m)            _rhizome_manifest_del_name(__WHENCE__,(m))
-#define rhizome_manifest_set_date(m,v)          _rhizome_manifest_set_date(__WHENCE__,(m),(v))
-#define rhizome_manifest_del_date(m)            _rhizome_manifest_del_date(__WHENCE__,(m))
-#define rhizome_manifest_set_sender(m,v)        _rhizome_manifest_set_sender(__WHENCE__,(m),(v))
-#define rhizome_manifest_del_sender(m)          _rhizome_manifest_del_sender(__WHENCE__,(m))
-#define rhizome_manifest_set_recipient(m,v)     _rhizome_manifest_set_recipient(__WHENCE__,(m),(v))
-#define rhizome_manifest_del_recipient(m)       _rhizome_manifest_del_recipient(__WHENCE__,(m))
-#define rhizome_manifest_set_crypt(m,v)         _rhizome_manifest_set_crypt(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_rowid(m,v)         _rhizome_manifest_set_rowid(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_inserttime(m,v)    _rhizome_manifest_set_inserttime(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_author(m,v)        _rhizome_manifest_set_author(__WHENCE__,(m),(v))
-#define rhizome_manifest_del_author(m)          _rhizome_manifest_del_author(__WHENCE__,(m))
+#define rhizome_manifest_set_id(m,v)                    _rhizome_manifest_set_id(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_version(m,v)               _rhizome_manifest_set_version(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_filesize(m,v)              _rhizome_manifest_set_filesize(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_filehash(m,v)              _rhizome_manifest_set_filehash(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_tail(m,v)                  _rhizome_manifest_set_tail(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_bundle_key(m,v)            _rhizome_manifest_set_bundle_key(__WHENCE__,(m),(v))
+#define rhizome_manifest_del_bundle_key(m)              _rhizome_manifest_del_bundle_key(__WHENCE__,(m))
+#define rhizome_manifest_set_service(m,v)               _rhizome_manifest_set_service(__WHENCE__,(m),(v))
+#define rhizome_manifest_del_service(m)                 _rhizome_manifest_del_service(__WHENCE__,(m))
+#define rhizome_manifest_set_name(m,v)                  _rhizome_manifest_set_name(__WHENCE__,(m),(v))
+#define rhizome_manifest_del_name(m)                    _rhizome_manifest_del_name(__WHENCE__,(m))
+#define rhizome_manifest_set_date(m,v)                  _rhizome_manifest_set_date(__WHENCE__,(m),(v))
+#define rhizome_manifest_del_date(m)                    _rhizome_manifest_del_date(__WHENCE__,(m))
+#define rhizome_manifest_set_sender(m,v)                _rhizome_manifest_set_sender(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_sender_concealed(m,v,k)    _rhizome_manifest_set_sender_concealed(__WHENCE__,(m),(v),(k))
+#define rhizome_manifest_del_sender(m)                  _rhizome_manifest_del_sender(__WHENCE__,(m))
+#define rhizome_manifest_set_recipient(m,v)             _rhizome_manifest_set_recipient(__WHENCE__,(m),(v))
+#define rhizome_manifest_del_recipient(m)               _rhizome_manifest_del_recipient(__WHENCE__,(m))
+#define rhizome_manifest_set_crypt(m,v)                 _rhizome_manifest_set_crypt(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_rowid(m,v)                 _rhizome_manifest_set_rowid(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_inserttime(m,v)            _rhizome_manifest_set_inserttime(__WHENCE__,(m),(v))
+#define rhizome_manifest_set_author(m,v)                _rhizome_manifest_set_author(__WHENCE__,(m),(v))
+#define rhizome_manifest_del_author(m)                  _rhizome_manifest_del_author(__WHENCE__,(m))
 
 void _rhizome_manifest_set_id(struct __sourceloc, rhizome_manifest *, const rhizome_bid_t *);
 void _rhizome_manifest_set_version(struct __sourceloc, rhizome_manifest *, uint64_t);
@@ -297,6 +298,7 @@ void _rhizome_manifest_del_name(struct __sourceloc, rhizome_manifest *);
 void _rhizome_manifest_set_date(struct __sourceloc, rhizome_manifest *, time_ms_t);
 void _rhizome_manifest_del_date(struct __sourceloc, rhizome_manifest *);
 void _rhizome_manifest_set_sender(struct __sourceloc, rhizome_manifest *, const sid_t *);
+void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome_manifest *m, const sid_t *sender, keyring_file *keyring);
 void _rhizome_manifest_del_sender(struct __sourceloc, rhizome_manifest *);
 void _rhizome_manifest_set_recipient(struct __sourceloc, rhizome_manifest *, const sid_t *);
 void _rhizome_manifest_del_recipient(struct __sourceloc, rhizome_manifest *);
@@ -860,7 +862,7 @@ int rhizome_database_filehash_from_id(const rhizome_bid_t *bidp, uint64_t versio
 int overlay_mdp_service_rhizome_sync(struct internal_mdp_header *header, struct overlay_buffer *payload);
 void rhizome_sync_status();
 
-int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *sender, keyring_file *keyring);
+int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE], unsigned char (*sender_auth_hash)[crypto_hash_sha512_BYTES]);
 
 DECLARE_ALARM(rhizome_fetch_status);
 #endif //__SERVAL_DNA__RHIZOME_H

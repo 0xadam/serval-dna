@@ -703,7 +703,7 @@ int generate_identity(const char *seed, struct sid_identity *identity)
  * and including the real sender value encrypted in a special manifest field.
  * TODO: Get receiver and sender from manifest?
  */
-int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *sender, keyring_file *keyring)
+int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE], unsigned char (*sender_auth_hash)[crypto_hash_sha512_BYTES])
 {
   unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
   unsigned char nm_bytes_auth[1024];
@@ -713,11 +713,6 @@ int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *send
   struct sid_identity identity; //if this is a pointer initialised to null generate_identity crashes at the first bcopy
   char seed[1 + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
   //char seed[512];
-  if (!m->has_recipient)
-  {
-    WHY("Cannot set concealed sender as recipient is not set"); //Need to handle in meshms.c... should I be asserting instead?
-    return 1;
-  }
 
   //roll identity here... currently unsure how to seed. Should I store in keyring so as to cache, or just generate every time?
   //look at generate_keypair() function, but instead make one for crypto_box_curve25519xsalsa20poly1305 as this is used for SID's
@@ -729,33 +724,33 @@ int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *send
   if (!keyring_find_sid(keyring, &cn, &in, &kp, sender))
 	  return MESHMS_STATUS_SID_LOCKED;
 
-  snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), alloca_tohex_sid_t(m->recipient));
+  snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), alloca_tohex_sid_t(*recipient));
 
   generate_identity(seed, &identity); //need to store this identity in the keyring
-  rhizome_manifest_set_sender(m,&identity.sid_public);
+  (*concealed_sender) = identity.sid_public;
   DEBUGF("FSIDTX = %s", alloca_tohex_sid_t(identity.sid_public));
 
 
   /* Generate authenticaiton info for RSIDRX */
 
   /* Generate shared secret  http://stackoverflow.com/questions/13663604/questions-about-the-nacl-crypto-library */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, m->recipient.binary, keyring
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, recipient->binary, keyring
 	  ->contexts[cn]
 	  ->identities[in]
 	  ->keypairs[kp]->private_key);
 
   assert(nm_bytes_auth != NULL);
   //fsidtx_public + Bundle ID + "auth"
-  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
+  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));
   bcopy(salt, nm_bytes_auth + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_auth) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
 
   crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth));
-  // The auth_hash should be stored in a manifest field here
+  bcopy(auth_hash, *sender_auth_hash, sizeof(*sender_auth_hash));
 
   /* Generate ID info for RSIDRX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, m->recipient.binary, identity.sid_private);
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, recipient->binary, identity.sid_private);
   assert(nm_bytes_id != NULL);
-  snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));   //fsidtx_public + Bundle ID + "id"
+  snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));   //fsidtx_public + Bundle ID + "id"
   bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
   crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
@@ -765,7 +760,11 @@ int rhizome_manifest_set_sender_concealed(rhizome_manifest *m, const sid_t *send
     for(i=0; i<SID_SIZE; i++) {
 		crypted_sid[i] = id_hash[i] ^ sender->binary[i]; //binary is an array of chars the size of SID_SIZE
   }
-	DEBUGF("Encrypted Serval ID = %s", crypted_sid);
+
+  bcopy(crypted_sid, *sender_crypted_sid, sizeof(*sender_crypted_sid));
+
+  DEBUGF("Encrypted Serval ID = %s", alloca_tohex(crypted_sid, SID_SIZE));
+
 
   return 0;
 }
@@ -799,16 +798,16 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring)
   crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
   unsigned i;
-  unsigned char decrypted_sid[SID_SIZE];
+  unsigned char decrypted_sender[SID_SIZE];
 
   for(i=0; i<SID_SIZE; i++) {
-    decrypted_sid[i] = id_hash[i] ^ m->sender_id_hash[i];
+    decrypted_sender[i] = id_hash[i] ^ m->concealed_sender[i];
   }
 
   /* Check this is indeed the case, using the auth hash from the manifest */
 
   /* Generate the shared secret with RSIDTX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, decrypted_sid, keyring
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, decrypted_sender, keyring
     ->contexts[cn]
     ->identities[in]
     ->keypairs[kp]->private_key);
@@ -821,7 +820,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring)
   crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
   //compare generated value to value stored in manifest here
-  if(bcmp(auth_hash, m->sender_auth_hash, crypto_hash_sha512_BYTES) != 0)
+  if(bcmp(auth_hash, m->concealed_sender_auth_hash, crypto_hash_sha512_BYTES) != 0)
   {
     return -1; //TODO: Actually return an error code here
   }
