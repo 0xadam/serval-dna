@@ -673,13 +673,11 @@ struct sid_identity{
 /* generate a serval identity deterministically from a given seed string */
 int generate_identity(const char *seed, struct sid_identity *identity)
 {
-  
-  // The first 256 bits (32 bytes) of the hash will be used as the private key of the BID.
 	unsigned char hash[crypto_hash_sha512_BYTES];
 	crypto_hash_sha512(hash, (unsigned char *)seed, strlen(seed));
 
-	// The first 256 bits (32 bytes) of the hash will be used as the private key of the BID.
-	bcopy(hash, identity->sid_private, sizeof identity->sid_private);
+	// The first 256 bits (32 bytes) of the hash will be used as the private key of the Signing Key.
+	bcopy(hash, identity->sign_private, sizeof identity->sign_private);
 
 
 	if (crypto_sign_compute_public_key(identity->sign_private, identity->sign_public) == -1)
@@ -694,7 +692,7 @@ int generate_identity(const char *seed, struct sid_identity *identity)
 	bcopy(hash + 32, identity->sid_private, sizeof identity->sid_private);
 	if (crypto_scalarmult_curve25519_base(identity->sid_public.binary, identity->sid_private) != 0)
 		return WHY("Could not generate public key");
-	bcopy(identity->sid_public.binary, identity->sign_private + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES, sizeof identity->sid_public.binary);
+	bcopy(identity->sid_public.binary, identity->sid_private + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES, sizeof identity->sid_public.binary);
 
 	return 0;
 }
