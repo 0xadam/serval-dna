@@ -1382,29 +1382,25 @@ keyring_identity *keyring_create_identity(keyring_file *k, keyring_context *c, c
     goto kci_safeexit;
   }
   /* If we are passed a seed, use this to generate keypairs deterministically */
-  if (strcmp(seed, "")!=0) {
-    keypair *kp = id->keypairs[id->keypair_count] = keyring_alloc_keypair(1, 0); //CRYPTOBOX
-    create_cryptobox_from_seed(seed, kp);
-    ++id->keypair_count;
-    
-    keypair *kp2 = id->keypairs[id->keypair_count] = keyring_alloc_keypair(2, 0); //CRYPTOSIGN
-    create_cryptosign_from_seed(seed, kp2);
-    ++id->keypair_count;
-    
-    keypair *kp3 = id->keypairs[id->keypair_count] = keyring_alloc_keypair(3, 0); //RHIZOME
-    create_rhizome(kp3);
-    ++id->keypair_count;
-  } else {
-    /* Allocate key pairs */
-    unsigned ktype;
-    for (ktype = 1; ktype < NELS(keytypes); ++ktype) {
-      if (keytypes[ktype].creator) {
-        keypair *kp = id->keypairs[id->keypair_count] = keyring_alloc_keypair(ktype, 0);
-        if (kp == NULL)
-  	goto kci_safeexit;
+
+  /* Allocate key pairs */
+  unsigned ktype;
+  for (ktype = 1; ktype < NELS(keytypes); ++ktype) {
+    if (keytypes[ktype].creator) {
+      keypair *kp = id->keypairs[id->keypair_count] = keyring_alloc_keypair(ktype, 0);
+      if (kp == NULL)
+	goto kci_safeexit;
+      if(strcmp(seed, "")!=0 && ktype >0 && ktype <=2) { //CRYPTOBOX and CRYPTOSIGN need custom creators for using a seed. Could potentially just reuse create_cryptobox?
+        if(ktype == 1)
+        {
+          create_cryptobox_from_seed(seed, kp);
+        } else {
+          create_cryptosign_from_seed(seed, kp);
+        }
+      } else {
         keytypes[ktype].creator(kp);
-        ++id->keypair_count;
       }
+      ++id->keypair_count;
     }
   }
   assert(id->keypair_count > 0);
