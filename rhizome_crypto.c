@@ -662,41 +662,6 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
   return 1;
 }
 
-//is there already a struct for this somewhere?
-struct sid_identity{
-	unsigned char sid_private[crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES];
-	sid_t sid_public;
-	unsigned char sign_private[crypto_sign_edwards25519sha512batch_SECRETKEYBYTES];
-	unsigned char sign_public[crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES];
-} sid_identity;
-
-/* generate a serval identity deterministically from a given seed string */
-int generate_identity(const char *seed, struct sid_identity *identity)
-{
-	unsigned char hash[crypto_hash_sha512_BYTES];
-	crypto_hash_sha512(hash, (unsigned char *)seed, strlen(seed));
-
-	// The first 256 bits (32 bytes) of the hash will be used as the private key of the Signing Key.
-	bcopy(hash, identity->sign_private, sizeof identity->sign_private);
-
-
-	if (crypto_sign_compute_public_key(identity->sign_private, identity->sign_public) == -1)
-		return WHY("Could not generate public signing key");
-
-	// The last 32 bytes of the private key should be identical to the public key.  This is what
-	// crypto_sign_edwards25519sha512batch_keypair() returns, and there is code that depends on it.
-	// TODO: Refactor the Rhizome private/public keypair to eliminate this duplication.
-	bcopy(identity->sign_public, identity->sign_private + crypto_sign_edwards25519sha512batch_SECRETKEYBYTES, sizeof identity->sign_public);
-	
-	// The last 256 bits (32 bytes) of the hash will be used as the private key of the SID.
-	bcopy(hash + 32, identity->sid_private, sizeof identity->sid_private);
-	if (crypto_scalarmult_curve25519_base(identity->sid_public.binary, identity->sid_private) != 0)
-		return WHY("Could not generate public key");
-	bcopy(identity->sid_public.binary, identity->sid_private + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES, sizeof identity->sid_public.binary);
-
-	return 0;
-}
-
 /* Conceal the sender of a rhizome bundle by generating a random SID for the sender
  * and including the real sender value encrypted in a special manifest field.
  * TODO: Get receiver and sender from manifest?
@@ -708,7 +673,6 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
   unsigned char auth_hash[crypto_hash_sha512_BYTES];
   unsigned char id_hash[crypto_hash_sha512_BYTES];
   char salt[69]; //32 + 32 + 4 + 1
-  struct sid_identity identity; //if this is a pointer initialised to null generate_identity crashes at the first bcopy
   char seed[1 + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
   //char seed[512];
 
@@ -724,10 +688,13 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
 
   snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), alloca_tohex_sid_t(*recipient));
 
-  generate_identity(seed, &identity); //need to store this identity in the keyring
-  (*concealed_sender) = identity.sid_public;
-  DEBUGF("FSIDTX = %s", alloca_tohex_sid_t(identity.sid_public));
+  /* Create the sid and signing keys deterministically and extract them*/
+  keyring_identity *id = keyring_create_identity(keyring, keyring->contexts[keyring->context_count - 1], "", seed); //k->contexts[k->context_count - 1] taken from commandline.c. Do I need to asset context_count is greater than 0?
+  const sid_t *sidp = NULL;
+  keyring_identity_extract(id, &sidp, NULL, NULL);
 
+  (*concealed_sender) = (*sidp);
+  DEBUGF("FSIDTX = %s", alloca_tohex_sid_t(*sidp));
 
   /* Generate authenticaiton info for RSIDRX */
 
@@ -739,16 +706,23 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
 
   assert(nm_bytes_auth != NULL);
   //fsidtx_public + Bundle ID + "auth"
-  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));
+  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(sidp->binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));
   bcopy(salt, nm_bytes_auth + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_auth) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
 
   crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth));
   bcopy(auth_hash, *sender_auth_hash, sizeof(*sender_auth_hash));
 
+  /* Extract private key for FSIDTX */
+  if (!keyring_find_sid(keyring, &cn, &in, &kp, sidp))
+    return MESHMS_STATUS_SID_LOCKED;
+
   /* Generate ID info for RSIDRX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, recipient->binary, identity.sid_private);
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, recipient->binary, keyring
+    ->contexts[cn]
+    ->identities[in]
+    ->keypairs[kp]->private_key);
   assert(nm_bytes_id != NULL);
-  snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(identity.sid_public.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));   //fsidtx_public + Bundle ID + "id"
+  snprintf(salt, sizeof(salt), "%s%sid", alloca_tohex(sidp->binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));   //fsidtx_public + Bundle ID + "id"
   bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
   crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 

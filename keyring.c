@@ -480,9 +480,41 @@ static void _derive_scalarmult_public(unsigned char *public, const unsigned char
   crypto_scalarmult_curve25519_base(public, private);
 }
 
+/* generate a serval identity deterministically from a given seed string */
+static int create_cryptobox_from_seed(const char *seed, keypair *keypair)
+{
+  unsigned char hash[crypto_hash_sha512_BYTES];
+  crypto_hash_sha512(hash, (unsigned char *)seed, strlen(seed));
+  
+  // The last 256 bits (32 bytes) of the hash will be used as the private key of the SID.
+  bcopy(hash + 32, keypair->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES);
+
+  if (crypto_scalarmult_curve25519_base(keypair->public_key, keypair->private_key) != 0)
+    return WHY("Could not generate public key");
+
+  bcopy(keypair->public_key, keypair->private_key + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES);
+
+  return 0;
+}
+
 static void create_cryptosign(keypair *kp)
 {
   crypto_sign_edwards25519sha512batch_keypair(kp->public_key, kp->private_key);
+}
+
+/* generate a serval signing identity deterministically from a given seed string */
+static int create_cryptosign_from_seed(const char *seed, keypair *keypair)
+{
+  unsigned char hash[crypto_hash_sha512_BYTES];
+  crypto_hash_sha512(hash, (unsigned char *)seed, strlen(seed));
+
+  // The first 256 bits (32 bytes) of the hash will be used as the private key of the Signing Key.
+  bcopy(hash, keypair->private_key, crypto_sign_edwards25519sha512batch_SECRETKEYBYTES);
+
+  if (crypto_sign_compute_public_key(keypair->private_key, keypair->public_key) == -1)
+    return WHY("Could not generate public signing key");
+
+  return 0;
 }
 
 static void create_rhizome(keypair *kp)
@@ -1321,7 +1353,7 @@ static int keyring_commit_identity(keyring_file *k, keyring_context *cx, keyring
  * PKR is packed and written to a hithero unallocated slot which is then marked full.  Requires an
  * explicit call to keyring_commit()
 */
-keyring_identity *keyring_create_identity(keyring_file *k, keyring_context *c, const char *pin)
+keyring_identity *keyring_create_identity(keyring_file *k, keyring_context *c, const char *pin, const char *seed)
 {
   if (config.debug.keyring)
     DEBUGF("k=%p", k);
@@ -1333,6 +1365,7 @@ keyring_identity *keyring_create_identity(keyring_file *k, keyring_context *c, c
     { WHY("keyring context has too many identities"); return NULL; }
 
   if (!pin) pin="";
+  if (!seed) seed="";
 
   keyring_identity *id = emalloc_zero(sizeof(keyring_identity));
   if (!id)
@@ -1348,16 +1381,30 @@ keyring_identity *keyring_create_identity(keyring_file *k, keyring_context *c, c
     WHY("no free slots in first slab (no support for more than one slab)");
     goto kci_safeexit;
   }
-
-  /* Allocate key pairs */
-  unsigned ktype;
-  for (ktype = 1; ktype < NELS(keytypes); ++ktype) {
-    if (keytypes[ktype].creator) {
-      keypair *kp = id->keypairs[id->keypair_count] = keyring_alloc_keypair(ktype, 0);
-      if (kp == NULL)
-	goto kci_safeexit;
-      keytypes[ktype].creator(kp);
-      ++id->keypair_count;
+  /* If we are passed a seed, use this to generate keypairs deterministically */
+  if (strcmp(seed, "")!=0) {
+    keypair *kp = id->keypairs[id->keypair_count] = keyring_alloc_keypair(1, 0); //CRYPTOBOX
+    create_cryptobox_from_seed(seed, kp);
+    ++id->keypair_count;
+    
+    keypair *kp2 = id->keypairs[id->keypair_count] = keyring_alloc_keypair(2, 0); //CRYPTOSIGN
+    create_cryptosign_from_seed(seed, kp2);
+    ++id->keypair_count;
+    
+    keypair *kp3 = id->keypairs[id->keypair_count] = keyring_alloc_keypair(3, 0); //RHIZOME
+    create_rhizome(kp3);
+    ++id->keypair_count;
+  } else {
+    /* Allocate key pairs */
+    unsigned ktype;
+    for (ktype = 1; ktype < NELS(keytypes); ++ktype) {
+      if (keytypes[ktype].creator) {
+        keypair *kp = id->keypairs[id->keypair_count] = keyring_alloc_keypair(ktype, 0);
+        if (kp == NULL)
+  	goto kci_safeexit;
+        keytypes[ktype].creator(kp);
+        ++id->keypair_count;
+      }
     }
   }
   assert(id->keypair_count > 0);
@@ -2074,7 +2121,7 @@ int keyring_seed(keyring_file *k)
   did[0]='2'+(((unsigned char)did[0])%8);
   /* Then add 10 more digits, which is what we do in the mobile phone software */
   for(i=1;i<11;i++) did[i]='0'+(((unsigned char)did[i])%10); did[11]=0;
-  keyring_identity *id=keyring_create_identity(k,k->contexts[0],"");
+  keyring_identity *id=keyring_create_identity(k,k->contexts[0],"",NULL);
   if (!id)
     return WHY("Could not create new identity");
   if (keyring_set_did(id, did, ""))
