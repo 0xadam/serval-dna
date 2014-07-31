@@ -512,8 +512,9 @@ static int create_cryptosign_from_seed(const char *seed, keypair *keypair)
   if (crypto_sign_compute_public_key(keypair->private_key, keypair->public_key) == -1)
     return WHY("Could not generate public signing key");
 
+  const int SIGNING_KEY_BYTES = crypto_sign_edwards25519sha512batch_SECRETKEYBYTES - crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES; //Equivalent to RHIZOME_BUNDLE_KEY_BYTES
   /* Apparently signing private key needs the last 32bytes to be the public key */
-  bcopy(keypair->public_key, keypair->private_key + crypto_sign_edwards25519sha512batch_SECRETKEYBYTES, crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES);
+  bcopy(keypair->public_key, keypair->private_key + SIGNING_KEY_BYTES, crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES);
 
   return 0;
 }
