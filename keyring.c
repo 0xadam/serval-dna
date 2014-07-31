@@ -492,8 +492,6 @@ static int create_cryptobox_from_seed(const char *seed, keypair *keypair)
   if (crypto_scalarmult_curve25519_base(keypair->public_key, keypair->private_key) != 0)
     return WHY("Could not generate public key");
 
-  bcopy(keypair->public_key, keypair->private_key + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES);
-
   return 0;
 }
 
@@ -513,6 +511,8 @@ static int create_cryptosign_from_seed(const char *seed, keypair *keypair)
 
   if (crypto_sign_compute_public_key(keypair->private_key, keypair->public_key) == -1)
     return WHY("Could not generate public signing key");
+
+  bcopy(keypair->public_key, keypair->private_key + crypto_sign_edwards25519sha512batch_SECRETKEYBYTES, crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES);
 
   return 0;
 }
