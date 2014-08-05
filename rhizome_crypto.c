@@ -769,7 +769,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring)
   unsigned char decrypted_sender[SID_SIZE];
 
   for(i=0; i<SID_SIZE; i++) {
-    decrypted_sender[i] = id_hash[i] ^ m->concealed_sender[i];
+    decrypted_sender[i] = id_hash[i] ^ m->concealedSender[i];
   }
 
   /* Check this is indeed the case, using the auth hash from the manifest */
@@ -788,7 +788,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring)
   crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
   //compare generated value to value stored in manifest here
-  if(bcmp(auth_hash, m->concealed_sender_auth_hash, crypto_hash_sha512_BYTES) != 0)
+  if(bcmp(auth_hash, m->concealedSenderAuthHash, crypto_hash_sha512_BYTES) != 0)
   {
     return -1; //TODO: Actually return an error code here
   }
