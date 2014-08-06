@@ -282,12 +282,9 @@ void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome
    unsigned char crypted_sid[SID_SIZE];
 
     generate_concealed_sender(sender, &m->recipient, &m->cryptoSignPublic, keyring, &concealed_sender, &crypted_sid);
-    const char *v = rhizome_manifest_set(m, "sender", alloca_tohex_sid_t(concealed_sender));
-    assert(v); // TODO: remove known manifest fields from vars[]
-    m->sender = concealed_sender;
 
-    const char *w = rhizome_manifest_set(m, "csender", alloca_tohex(crypted_sid, SID_SIZE));
-    assert(w);
+    const char *v = rhizome_manifest_set(m, "csender", alloca_tohex(crypted_sid, SID_SIZE));
+    assert(v);
     bcopy(crypted_sid, m->csender, SID_SIZE);
 
     m->has_sender = 0;
