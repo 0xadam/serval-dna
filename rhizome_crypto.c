@@ -748,10 +748,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, s
   unsigned i;
 
   for(i=0; i<SID_SIZE; i++) {
-    decrypted_sender->binary[i] = id_hash[i] ^ m->concealedSender[i];
+    decrypted_sender->binary[i] = id_hash[i] ^ m->csender[i];
   }
-
-
-
   return 0;
 }

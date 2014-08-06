@@ -213,9 +213,8 @@ typedef struct rhizome_manifest
   sid_t recipient;
 
   /* The concealed sender field has is the XOR'd shared secret and real identity.
-     The auth field is a hash allowing a recipient to authenticate sender.
    */
-  unsigned char concealedSender[SID_SIZE];
+  unsigned char csender[SID_SIZE];
 
   /* Local data, not encapsulated in the bundle.  The ROWID of the SQLite
    * MANIFESTS table row in which this manifest is stored.  Zero if the

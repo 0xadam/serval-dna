@@ -286,9 +286,9 @@ void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome
     assert(v); // TODO: remove known manifest fields from vars[]
     m->sender = concealed_sender;
 
-    const char *w = rhizome_manifest_set(m, "concealedSender", alloca_tohex(crypted_sid, SID_SIZE));
+    const char *w = rhizome_manifest_set(m, "csender", alloca_tohex(crypted_sid, SID_SIZE));
     assert(w);
-    bcopy(crypted_sid, m->concealedSender, SID_SIZE);
+    bcopy(crypted_sid, m->csender, SID_SIZE);
 
     m->has_sender = 0;
     m->finalised = 0;
