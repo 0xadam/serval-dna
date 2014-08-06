@@ -266,7 +266,6 @@ void _rhizome_manifest_set_sender(struct __sourceloc __whence, rhizome_manifest 
     assert(v); // TODO: remove known manifest fields from vars[]
     m->sender = *sidp;
     m->has_sender = 1;
-    m->is_sender_concealed = 0;
     m->finalised = 0;
   } else
     _rhizome_manifest_del_sender(__whence, m);
@@ -281,9 +280,8 @@ void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome
   }
    sid_t concealed_sender;
    unsigned char crypted_sid[SID_SIZE];
-   unsigned char sender_auth_hash[crypto_hash_sha512_BYTES];
 
-    generate_concealed_sender(sender, &m->recipient, &m->cryptoSignPublic, keyring, &concealed_sender, &crypted_sid, &sender_auth_hash);
+    generate_concealed_sender(sender, &m->recipient, &m->cryptoSignPublic, keyring, &concealed_sender, &crypted_sid);
     const char *v = rhizome_manifest_set(m, "sender", alloca_tohex_sid_t(concealed_sender));
     assert(v); // TODO: remove known manifest fields from vars[]
     m->sender = concealed_sender;
@@ -292,12 +290,7 @@ void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome
     assert(w);
     bcopy(crypted_sid, m->concealedSender, SID_SIZE);
 
-    const char *x = rhizome_manifest_set(m, "concealedSenderAuthHash", alloca_tohex(sender_auth_hash, crypto_hash_sha512_BYTES));
-    assert(x);
-    bcopy(sender_auth_hash, m->concealedSenderAuthHash, crypto_hash_sha512_BYTES);
-
-    m->has_sender = 1;
-    m->is_sender_concealed = 1;
+    m->has_sender = 0;
     m->finalised = 0;
 }
 

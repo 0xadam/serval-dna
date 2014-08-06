@@ -666,11 +666,9 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
  * and including the real sender value encrypted in a special manifest field.
  * TODO: Get receiver and sender from manifest?
  */
-int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE], unsigned char (*sender_auth_hash)[crypto_hash_sha512_BYTES])
+int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE])
 {
   unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
-  unsigned char nm_bytes_auth[1024];
-  unsigned char auth_hash[crypto_hash_sha512_BYTES];
   unsigned char id_hash[crypto_hash_sha512_BYTES];
   char salt[69]; //32 + 32 + 4 + 1
   char seed[1 + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
@@ -691,22 +689,6 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
 
   (*concealed_sender) = (*sidp);
   DEBUGF("FSIDTX = %s", alloca_tohex_sid_t(*sidp));
-
-  /* Generate authenticaiton info for RSIDRX */
-
-  /* Generate shared secret  http://stackoverflow.com/questions/13663604/questions-about-the-nacl-crypto-library */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, recipient->binary, keyring
-	  ->contexts[cn]
-	  ->identities[in]
-	  ->keypairs[kp]->private_key);
-
-  assert(nm_bytes_auth != NULL);
-  //fsidtx_public + Bundle ID + "auth"
-  snprintf(salt, sizeof(salt), "%s%sauth", alloca_tohex(sidp->binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));
-  bcopy(salt, nm_bytes_auth + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_auth) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
-
-  crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth));
-  bcopy(auth_hash, *sender_auth_hash, sizeof(*sender_auth_hash));
 
   /* Extract private key for FSIDTX */
   if (!keyring_find_sid(keyring, &cn, &in, &kp, sidp))
@@ -737,14 +719,12 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
   return 0;
 }
 
-int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring)
+int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, sid_t *decrypted_sender)
 {
 
   unsigned char id_hash[crypto_hash_sha512_BYTES]; //need to set these
-  unsigned char auth_hash[crypto_hash_sha512_BYTES];
 
   unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
-  unsigned char nm_bytes_auth[1024];
   char salt[69]; //32 + 32 + 4 + 1
 
   /* Find our private key associated with our SID*/
@@ -766,32 +746,12 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring)
   crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
   unsigned i;
-  unsigned char decrypted_sender[SID_SIZE];
 
   for(i=0; i<SID_SIZE; i++) {
-    decrypted_sender[i] = id_hash[i] ^ m->concealedSender[i];
+    decrypted_sender->binary[i] = id_hash[i] ^ m->concealedSender[i];
   }
 
-  /* Check this is indeed the case, using the auth hash from the manifest */
 
-  /* Generate the shared secret with RSIDTX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_auth, decrypted_sender, keyring
-    ->contexts[cn]
-    ->identities[in]
-    ->keypairs[kp]->private_key);
-
-  /* Generate the salt value */
-  snprintf(salt, sizeof(salt), "%s%sauth",alloca_tohex(m->sender.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
-
-  /* Hash combined shared secret and salt and use to authenticate decrypted sid */
-  bcopy(salt, nm_bytes_auth + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_auth) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES);
-  crypto_hash_sha512(auth_hash, nm_bytes_auth, sizeof(nm_bytes_auth)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
-
-  //compare generated value to value stored in manifest here
-  if(bcmp(auth_hash, m->concealedSenderAuthHash, crypto_hash_sha512_BYTES) != 0)
-  {
-    return -1; //TODO: Actually return an error code here
-  }
 
   return 0;
 }

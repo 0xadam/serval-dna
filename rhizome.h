@@ -212,14 +212,10 @@ typedef struct rhizome_manifest
   sid_t sender;
   sid_t recipient;
 
-  /* If sender is concealed this field is set.
-  */
-  bool_t is_sender_concealed;
-  /* The real sender field has is the XOR'd shared secret and real identity.
+  /* The concealed sender field has is the XOR'd shared secret and real identity.
      The auth field is a hash allowing a recipient to authenticate sender.
    */
   unsigned char concealedSender[SID_SIZE];
-  unsigned char concealedSenderAuthHash[crypto_hash_sha512_BYTES];
 
   /* Local data, not encapsulated in the bundle.  The ROWID of the SQLite
    * MANIFESTS table row in which this manifest is stored.  Zero if the
@@ -862,7 +858,7 @@ int rhizome_database_filehash_from_id(const rhizome_bid_t *bidp, uint64_t versio
 int overlay_mdp_service_rhizome_sync(struct internal_mdp_header *header, struct overlay_buffer *payload);
 void rhizome_sync_status();
 
-int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE], unsigned char (*sender_auth_hash)[crypto_hash_sha512_BYTES]);
+int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE]);
 
 DECLARE_ALARM(rhizome_fetch_status);
 #endif //__SERVAL_DNA__RHIZOME_H
