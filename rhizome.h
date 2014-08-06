@@ -158,10 +158,11 @@ typedef struct rhizome_manifest
    */
   bool_t has_bundle_key;
 
-  /* Set if the sender and recipient fields are valid, ie, the manifest
-   * contains a valid "sender"/"recipient" field.
+  /* Set if the sender, csender and recipient fields are valid, ie, the manifest
+   * contains a valid "sender"/"csender"/"recipient" field.
    */
   bool_t has_sender;
+  bool_t has_csender;
   bool_t has_recipient;
 
   /* Local authorship.  Useful for dividing bundle lists between "sent" and
@@ -212,9 +213,14 @@ typedef struct rhizome_manifest
   sid_t sender;
   sid_t recipient;
 
-  /* The concealed sender field has is the XOR'd shared secret and real identity.
+  /* Contains the concealed sender.
    */
   unsigned char csender[SID_SIZE];
+  
+  /* The public key of the identity used to generate the concealed sender.
+   */
+  sid_t csenderPublic;
+
 
   /* Local data, not encapsulated in the bundle.  The ROWID of the SQLite
    * MANIFESTS table row in which this manifest is stored.  Zero if the
