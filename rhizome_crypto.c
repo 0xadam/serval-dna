@@ -670,7 +670,7 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
 {
   unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
   unsigned char id_hash[crypto_hash_sha512_BYTES];
-  char salt[69]; //32 + 32 + 4 + 1
+  char salt[79]; //32 + 32 + 14 + 1
   char seed[1 + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
   //char seed[512];
  
