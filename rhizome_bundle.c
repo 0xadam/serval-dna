@@ -297,6 +297,21 @@ void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome
     m->finalised = 0;
 }
 
+void _rhizome_manifest_del_sender_concealed(struct __sourceloc __whence, rhizome_manifest *m)
+{
+  if (m->has_csender) {
+    rhizome_manifest_del(m, "csender");
+    rhizome_manifest_del(m, "csenderPublic");
+    m->csender = NULL; //is this correct?
+    m->csenderPublic = SID_ANY; //is this correct?
+    m->has_csender = 0;
+    m->finalised = 0;
+  } else {
+    assert(rhizome_manifest_get(m, "csender") == NULL);
+    assert(rhizome_manifest_get(m, "csenderPublic") == NULL);
+  }
+}
+
 void _rhizome_manifest_del_sender(struct __sourceloc __whence, rhizome_manifest *m)
 {
   if (m->has_sender) {
