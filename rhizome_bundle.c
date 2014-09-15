@@ -302,7 +302,8 @@ void _rhizome_manifest_del_sender_concealed(struct __sourceloc __whence, rhizome
   if (m->has_csender) {
     rhizome_manifest_del(m, "csender");
     rhizome_manifest_del(m, "csenderPublic");
-    m->csender = NULL; //is this correct?
+    memset(m->csender,0,sizeof(m->csender));
+    //m->csender = NULL; // no idea why this doesn't work
     m->csenderPublic = SID_ANY; //is this correct?
     m->has_csender = 0;
     m->finalised = 0;
