@@ -217,6 +217,7 @@ enum rhizome_secret_disposition find_rhizome_secret(const sid_t *authorSidp, siz
  */
 void rhizome_authenticate_author(rhizome_manifest *m)
 {
+  DEBUGF("manifest[%d] is checking for author=%s", m->manifest_record_number, alloca_tohex_sid_t(m->author));
   IN();
   if (!m->has_bundle_key)
     RETURNVOID;
@@ -739,7 +740,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, s
     ->keypairs[kp]->private_key);
 
   /* Generate id hash salt value */
-  snprintf(salt, sizeof(salt), "%s%sidentification",alloca_tohex(m->sender.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
+  snprintf(salt, sizeof(salt), "%s%sidentification",alloca_tohex(m->csenderPublic.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
 
   /* Hash combined shared secret and salt and use to decrypt sid */
   bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
