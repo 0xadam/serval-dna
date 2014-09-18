@@ -709,7 +709,7 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
     ->identities[in]
     ->keypairs[kp]->private_key);
   assert(nm_bytes_id != NULL);
-  snprintf(salt, sizeof(salt), "%s%sidentification", alloca_tohex(sidp->binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(*bid));   //fsidtx_public + Bundle ID + "id"
+  snprintf(salt, sizeof(salt), "%s%sidentification", alloca_tohex_sid_t(*sidp), alloca_tohex_rhizome_bid_t(*bid));   //fsidtx_public + Bundle ID + "id"
   bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
   crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
 
@@ -748,7 +748,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, s
     ->keypairs[kp]->private_key);
 
   /* Generate id hash salt value */
-  snprintf(salt, sizeof(salt), "%s%sidentification",alloca_tohex(m->csenderPublic.binary, crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
+  snprintf(salt, sizeof(salt), "%s%sidentification",alloca_tohex_sid_t(m->csenderPublic), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
 
   /* Hash combined shared secret and salt and use to decrypt sid */
   bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
