@@ -1194,7 +1194,7 @@ int rhizome_manifest_set_name_from_path(rhizome_manifest *m, const char *filepat
  *  - create an ID if there is none, otherwise authenticate the existing one
  *  - if service is file, then use the payload file's basename for "name"
  */
-int rhizome_fill_manifest(rhizome_manifest *m, const char *filepath, const sid_t *authorSidp)
+int rhizome_fill_manifest(rhizome_manifest *m, const char *filepath, const sid_t *authorSidp, const char *seed)
 {
   /* Set version of manifest from current time if not already set. */
   if (m->version == 0)
@@ -1213,7 +1213,7 @@ int rhizome_fill_manifest(rhizome_manifest *m, const char *filepath, const sid_t
   if (!m->haveSecret && !m->has_id) {
     if (config.debug.rhizome)
       DEBUG("creating new bundle");
-    if (rhizome_manifest_createid(m) == -1)
+    if (rhizome_manifest_createid(m,seed) == -1)
       return WHY("Could not bind manifest to an ID");
     if (m->authorship != ANONYMOUS)
       rhizome_manifest_add_bundle_key(m); // set the BK field
