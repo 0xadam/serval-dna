@@ -210,7 +210,7 @@ static int app_keyring_add(const struct cli_parsed *parsed, struct cli_context *
     return -1;
   keyring_enter_pin(k, pin);
   assert(k->context_count > 0);
-  const keyring_identity *id = keyring_create_identity(k, k->contexts[k->context_count - 1], pin);
+  const keyring_identity *id = keyring_create_identity(k, k->contexts[k->context_count - 1], pin, NULL);
   if (id == NULL) {
     keyring_free(k);
     return WHY("Could not create new identity");
