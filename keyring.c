@@ -500,7 +500,9 @@ static void create_cryptosign(keypair *kp)
   crypto_sign_edwards25519sha512batch_keypair(kp->public_key, kp->private_key);
 }
 
-/* generate a serval signing identity deterministically from a given seed string */
+/* Generate a serval signing identity deterministically from a given seed string.
+   Turns out it's a duplicate of the generate_keypair function from rhizome_crypto.c
+   Should I be using that one somehow or move the generate_keypair func or...? */
 static int create_cryptosign_from_seed(const char *seed, keypair *keypair)
 {
   unsigned char hash[crypto_hash_sha512_BYTES];
