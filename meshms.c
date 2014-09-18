@@ -208,7 +208,19 @@ static int create_ply(const sid_t *my_sid, struct meshms_conversations *conv, rh
   rhizome_manifest_set_sender_concealed(m,my_sid, keyring);
   rhizome_manifest_set_filesize(m, 0);
   rhizome_manifest_set_tail(m, 0);
-  if (rhizome_fill_manifest(m, NULL, my_sid, NULL))
+
+  /* Find our private key */
+  unsigned cn=0, in=0, kp=0;
+  if (!keyring_find_sid(keyring,&cn,&in,&kp,my_sid))
+    return MESHMS_STATUS_SID_LOCKED;
+
+  char seed[1024];
+  snprintf(seed, sizeof(seed),
+    "%s%scomparability", alloca_tohex_sid_t(conv->them),
+	alloca_tohex(keyring->contexts[cn]->identities[in]
+	->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES));
+
+  if (rhizome_fill_manifest(m, NULL, my_sid, seed))
     return -1;
   assert(m->haveSecret);
   assert(m->payloadEncryption == PAYLOAD_ENCRYPTED);
