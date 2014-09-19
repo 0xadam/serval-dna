@@ -742,7 +742,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, s
     return MESHMS_STATUS_SID_LOCKED;
 
   /* Generate the shared secret with FSIDTX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, m->sender.binary, keyring
+  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, m->csenderPublic.binary, keyring
     ->contexts[cn]
     ->identities[in]
     ->keypairs[kp]->private_key);
