@@ -679,7 +679,7 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
 {
   unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
   unsigned char id_hash[crypto_hash_sha512_BYTES];
-  char salt[79]; //32 + 32 + 14 + 1
+  char salt[1024]; //need to find the propper value for this
   char seed[1 + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
   //char seed[512];
  
@@ -734,7 +734,7 @@ int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, s
   unsigned char id_hash[crypto_hash_sha512_BYTES]; //need to set these
 
   unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
-  char salt[69]; //32 + 32 + 4 + 1
+  char salt[1024]; //need to find the propper value for this
 
   /* Find our private key associated with our SID*/
   unsigned cn = 0, in = 0, kp = 0;
