@@ -531,7 +531,7 @@ static int insert_mime_part_end(struct http_request *hr)
       rhizome_apply_bundle_secret(r->manifest, &r->u.insert.bundle_secret);
     if (r->manifest->service == NULL)
       rhizome_manifest_set_service(r->manifest, RHIZOME_SERVICE_FILE);
-    if (rhizome_fill_manifest(r->manifest, NULL, r->u.insert.received_author ? &r->u.insert.author: NULL, NULL) == -1) {
+    if (rhizome_fill_manifest(r->manifest, NULL, r->u.insert.received_author ? &r->u.insert.author: NULL) == -1) {
       WHY("rhizome_fill_manifest() failed");
       return 500;
     }

@@ -248,7 +248,7 @@ static int rhizome_direct_addfile_end(struct http_request *hr)
     if (m->service == NULL)
       rhizome_manifest_set_service(m, RHIZOME_SERVICE_FILE);
     const sid_t *author = is_sid_t_any(config.rhizome.api.addfile.default_author) ? NULL : &config.rhizome.api.addfile.default_author;
-    if (rhizome_fill_manifest(m, r->u.direct_import.data_file_name, author, NULL)) {
+    if (rhizome_fill_manifest(m, r->u.direct_import.data_file_name, author)) {
       rhizome_manifest_free(m);
       rhizome_direct_clear_temporary_files(r);
       http_request_simple_response(&r->http, 500, "Internal Error: Could not fill manifest");

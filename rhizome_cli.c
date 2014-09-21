@@ -212,7 +212,7 @@ static int app_rhizome_add_file(const struct cli_parsed *parsed, struct cli_cont
     rhizome_apply_bundle_secret(m, &bsk);
   if (m->service == NULL)
     rhizome_manifest_set_service(m, RHIZOME_SERVICE_FILE);
-  if (rhizome_fill_manifest(m, filepath, *authorSidHex ? &authorSid : NULL, NULL)) {
+  if (rhizome_fill_manifest(m, filepath, *authorSidHex ? &authorSid : NULL)) {
     rhizome_manifest_free(m);
     keyring_free(keyring);
     keyring = NULL;

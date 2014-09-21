@@ -357,7 +357,7 @@ struct rhizome_cleanup_report {
 int rhizome_cleanup(struct rhizome_cleanup_report *report);
 int rhizome_store_cleanup(struct rhizome_cleanup_report *report);
 void rhizome_vacuum_db(sqlite_retry_state *retry);
-int rhizome_manifest_createid(rhizome_manifest *m, const char *seed);
+int rhizome_manifest_createid(rhizome_manifest *m);
 int rhizome_get_bundle_from_seed(rhizome_manifest *m, const char *seed, const sid_t *author);
 
 struct rhizome_manifest_summary {
@@ -421,7 +421,7 @@ int rhizome_store_file(rhizome_manifest *m,const unsigned char *key);
 int rhizome_bundle_import_files(rhizome_manifest *m, rhizome_manifest **m_out, const char *manifest_path, const char *filepath);
 
 int rhizome_manifest_set_name_from_path(rhizome_manifest *m, const char *filepath);
-int rhizome_fill_manifest(rhizome_manifest *m, const char *filepath, const sid_t *authorSidp, const char *seed);
+int rhizome_fill_manifest(rhizome_manifest *m, const char *filepath, const sid_t *authorSidp);
 
 int rhizome_apply_bundle_secret(rhizome_manifest *, const rhizome_bk_t *);
 int rhizome_manifest_add_bundle_key(rhizome_manifest *);

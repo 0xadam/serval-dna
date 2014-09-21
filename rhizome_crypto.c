@@ -34,17 +34,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 /* Basically just a wrapper for rhizome_get_bundle_from_seed
    It will always take the path of creating a new id because
    this function is only called in rhizome_fill_manifest in rhizome_bundle.c */
-int rhizome_manifest_createid(rhizome_manifest *m, const char *seed)
+int rhizome_manifest_createid(rhizome_manifest *m)
 {
-  if (!seed) {
     if (crypto_sign_edwards25519sha512batch_keypair(m->cryptoSignPublic.binary, m->cryptoSignSecret))
       return WHY("Failed to create keypair for manifest ID.");
     rhizome_manifest_set_id(m, &m->cryptoSignPublic);
     m->haveSecret = NEW_BUNDLE_ID;
-  } else {
-    if(rhizome_get_bundle_from_seed(m,seed, NULL) == -1)
-      return WHY("Failed to create keypair for manifest ID from seed.");
-  }
+
   // A new Bundle ID and secret invalidates any existing BK field.
   rhizome_manifest_del_bundle_key(m);
   return 0;
