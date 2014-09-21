@@ -206,7 +206,6 @@ static int create_ply(const sid_t *my_sid, struct meshms_conversations *conv, rh
   rhizome_manifest_set_service(m, RHIZOME_SERVICE_MESHMS2);
   rhizome_manifest_set_sender(m, my_sid);
   rhizome_manifest_set_recipient(m, &conv->them);
-  rhizome_manifest_set_sender_concealed(m, keyring);
   rhizome_manifest_set_filesize(m, 0);
   rhizome_manifest_set_tail(m, 0);
 

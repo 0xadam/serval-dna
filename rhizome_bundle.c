@@ -274,11 +274,6 @@ void _rhizome_manifest_set_sender(struct __sourceloc __whence, rhizome_manifest 
 
 void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome_manifest *m, keyring_file *keyring)
 {
-      if (!m->has_recipient)
-  {
-    //WHY("Cannot set concealed sender as recipient is not set"); //Need to handle in meshms.c... should I be asserting instead?
-    //return 1;
-  }
    sid_t concealed_sender;
    unsigned char crypted_sid[SID_SIZE];
 
@@ -1248,13 +1243,15 @@ int rhizome_fill_manifest(rhizome_manifest *m, const char *filepath, const sid_t
 
   // Anything sent from one person to another should be considered private and encrypted by default.
   if (   m->payloadEncryption == PAYLOAD_CRYPT_UNKNOWN
-      && (m->has_sender || m->has_csender)
+      && m->has_sender
       && m->has_recipient
       && !is_sid_t_broadcast(m->recipient)
   ) {
     if (config.debug.rhizome)
       DEBUGF("Implicitly adding payload encryption due to presense of sender (or csender) & recipient fields");
     rhizome_manifest_set_crypt(m, PAYLOAD_ENCRYPTED);
+	/* Always conceal a sender if we have a sender and recipient */
+	rhizome_manifest_set_sender_concealed(m, keyring);
   }
 
   return 0;
