@@ -275,7 +275,7 @@ typedef struct rhizome_manifest
 #define rhizome_manifest_set_date(m,v)                  _rhizome_manifest_set_date(__WHENCE__,(m),(v))
 #define rhizome_manifest_del_date(m)                    _rhizome_manifest_del_date(__WHENCE__,(m))
 #define rhizome_manifest_set_sender(m,v)                _rhizome_manifest_set_sender(__WHENCE__,(m),(v))
-#define rhizome_manifest_set_sender_concealed(m,v,k)    _rhizome_manifest_set_sender_concealed(__WHENCE__,(m),(v),(k))
+#define rhizome_manifest_set_sender_concealed(m,v)      _rhizome_manifest_set_sender_concealed(__WHENCE__,(m),(v))
 #define rhizome_manifest_del_sender(m)                  _rhizome_manifest_del_sender(__WHENCE__,(m))
 #define rhizome_manifest_set_recipient(m,v)             _rhizome_manifest_set_recipient(__WHENCE__,(m),(v))
 #define rhizome_manifest_del_recipient(m)               _rhizome_manifest_del_recipient(__WHENCE__,(m))
@@ -299,7 +299,7 @@ void _rhizome_manifest_del_name(struct __sourceloc, rhizome_manifest *);
 void _rhizome_manifest_set_date(struct __sourceloc, rhizome_manifest *, time_ms_t);
 void _rhizome_manifest_del_date(struct __sourceloc, rhizome_manifest *);
 void _rhizome_manifest_set_sender(struct __sourceloc, rhizome_manifest *, const sid_t *);
-void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome_manifest *m, const sid_t *sender, keyring_file *keyring);
+void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome_manifest *m, keyring_file *keyring);
 void _rhizome_manifest_del_sender(struct __sourceloc, rhizome_manifest *);
 void _rhizome_manifest_set_recipient(struct __sourceloc, rhizome_manifest *, const sid_t *);
 void _rhizome_manifest_del_recipient(struct __sourceloc, rhizome_manifest *);

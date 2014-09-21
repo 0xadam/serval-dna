@@ -272,7 +272,7 @@ void _rhizome_manifest_set_sender(struct __sourceloc __whence, rhizome_manifest 
     _rhizome_manifest_del_sender(__whence, m);
 }
 
-void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome_manifest *m, const sid_t *sender, keyring_file *keyring)
+void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome_manifest *m, keyring_file *keyring)
 {
       if (!m->has_recipient)
   {
@@ -282,7 +282,7 @@ void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome
    sid_t concealed_sender;
    unsigned char crypted_sid[SID_SIZE];
 
-    generate_concealed_sender(sender, &m->recipient, &m->cryptoSignPublic, keyring, &concealed_sender, &crypted_sid);
+    generate_concealed_sender(&m->sender, &m->recipient, &m->cryptoSignPublic, keyring, &concealed_sender, &crypted_sid);
 
     const char *v = rhizome_manifest_set(m, "csender", alloca_tohex(crypted_sid, SID_SIZE));
     assert(v);
