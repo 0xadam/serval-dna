@@ -358,7 +358,7 @@ int rhizome_cleanup(struct rhizome_cleanup_report *report);
 int rhizome_store_cleanup(struct rhizome_cleanup_report *report);
 void rhizome_vacuum_db(sqlite_retry_state *retry);
 int rhizome_manifest_createid(rhizome_manifest *m, const char *seed);
-int rhizome_get_bundle_from_seed(rhizome_manifest *m, const char *seed);
+int rhizome_get_bundle_from_seed(rhizome_manifest *m, const char *seed, const sid_t *author);
 
 struct rhizome_manifest_summary {
   rhizome_bid_t bid;

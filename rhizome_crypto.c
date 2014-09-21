@@ -42,7 +42,7 @@ int rhizome_manifest_createid(rhizome_manifest *m, const char *seed)
     rhizome_manifest_set_id(m, &m->cryptoSignPublic);
     m->haveSecret = NEW_BUNDLE_ID;
   } else {
-    if(rhizome_get_bundle_from_seed(m,seed) == -1)
+    if(rhizome_get_bundle_from_seed(m,seed, NULL) == -1)
       return WHY("Failed to create keypair for manifest ID from seed.");
   }
   // A new Bundle ID and secret invalidates any existing BK field.
@@ -74,7 +74,7 @@ static int generate_keypair(const char *seed, struct signing_key *key)
 
 /* Generate a bundle id deterministically from the given seed.
  * Then either fetch it from the database or initialise a new empty manifest */
-int rhizome_get_bundle_from_seed(rhizome_manifest *m, const char *seed)
+int rhizome_get_bundle_from_seed(rhizome_manifest *m, const char *seed, const sid_t *author)
 {
   struct signing_key key;
   if (generate_keypair(seed, &key))
@@ -88,6 +88,10 @@ int rhizome_get_bundle_from_seed(rhizome_manifest *m, const char *seed)
     m->haveSecret = NEW_BUNDLE_ID;
   } else {
     m->haveSecret = EXISTING_BUNDLE_ID;
+  }
+  if(author)
+  {
+    rhizome_manifest_set_author(m, author);
   }
   bcopy(key.Private, m->cryptoSignSecret, sizeof m->cryptoSignSecret);
   // Disabled for performance, these asserts should nevertheless always hold.

@@ -60,7 +60,7 @@ static enum meshms_status get_my_conversation_bundle(const sid_t *my_sidp, rhizo
 	alloca_tohex(keyring->contexts[cn]->identities[in]
 	->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES));
 	
-  if (rhizome_get_bundle_from_seed(m, seed) == -1)
+  if (rhizome_get_bundle_from_seed(m, seed, my_sidp) == -1)
     return MESHMS_STATUS_ERROR;
   
   // always consider the content encrypted, we don't need to rely on the manifest itself.
