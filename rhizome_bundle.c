@@ -288,7 +288,7 @@ void _rhizome_manifest_set_sender_concealed(struct __sourceloc __whence, rhizome
     m->csenderPublic = concealed_sender;
 
     m->has_csender = 1;
-    m->has_sender = 0; // do I really need to set this?
+    _rhizome_manifest_del_sender(__whence, m);
     m->finalised = 0;
 }
 
