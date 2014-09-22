@@ -759,6 +759,7 @@ int rhizome_manifest_parse(rhizome_manifest *m)
       if (strlen((char *)&m->csender) == SID_SIZE) {
   assert(!m->has_csender);
   status = FIELD_OK;
+  bcopy(value, m->csender, SID_SIZE);
   m->has_csender = 1;
   if (config.debug.rhizome_manifest)
     DEBUGF("PARSE manifest[%d].csender = %s", m->manifest_record_number, alloca_tohex(m->csender, SID_SIZE));
