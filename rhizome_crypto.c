@@ -627,7 +627,7 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
   } else if (m->has_csender) { // Sender is concealed and we are recipient
     if(config.debug.rhizome)
       DEBUGF("We are the recipient of this payload");
-    decrypt_concealed_sender(m, keyring, sender);
+    decrypt_concealed_sender(m, sender);
   } 
   
   if (sender && m->has_recipient) {
@@ -690,23 +690,55 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
   return 1;
 }
 
+int xor_csender(const sid_t *my_sid,const sid_t *their_sid,const rhizome_bid_t *bid, const sid_t *fsidtx_public, const unsigned char *input, unsigned char *output)
+{
+  DEBUGF("xor csender input is %s",alloca_tohex(input, SID_SIZE));
+
+  unsigned char *nm_bytes_id; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
+  unsigned char key[crypto_hash_sha512_BYTES];
+  char salt[SID_SIZE*2 + crypto_sign_edwards25519sha512batch_PUBLICKEYBYTES*2 + 14 + 1];
+  
+  nm_bytes_id = keyring_get_nm_bytes(my_sid, their_sid);
+  assert(nm_bytes_id != NULL);
+    FILE *fp;
+fp=fopen("/home/adam/serval-dna/test.txt", "a");
+    fprintf(fp,"Us: %s | Them: %s\n", alloca_tohex_sid_t(*my_sid), alloca_tohex_sid_t(*their_sid));
+  snprintf(salt, sizeof(salt), "%s%sidentification", alloca_tohex_sid_t(*fsidtx_public), alloca_tohex_rhizome_bid_t(*bid));   //fsidtx_public + Bundle ID + "id"
+  DEBUGF("xor csender salt is %s",salt);
+  fprintf(fp,"Salt: %s\n", alloca_tohex((unsigned char *)salt, sizeof(salt)));
+  bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(salt)); //security issue using sizeof salt here? Should limit it somehow...
+  crypto_hash_sha512(key, nm_bytes_id, crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES + sizeof(salt)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
+
+  DEBUGF("Encryption Key is %s", alloca_tohex(key, crypto_hash_sha512_BYTES));
+
+fprintf(fp,"Key: %s\n", alloca_tohex(key, crypto_hash_sha512_BYTES));
+
+  /* Encrypt RSIDTX by XORing with ID shared secret */
+
+  /* All elements to zero, as we do not have to deal with endianness then */
+  unsigned char nonce[crypto_stream_xsalsa20_NONCEBYTES] = {0};
+
+  int ret = crypto_stream_xsalsa20_xor(output, input, SID_SIZE, nonce, key);
+  fprintf(fp,"Output: %s\n", output);
+fclose(fp);
+
+
+  return ret;
+}
+
 /* Conceal the sender of a rhizome bundle by generating a random SID for the sender
  * and including the real sender value encrypted in a special manifest field.
  * TODO: Get receiver and sender from manifest?
  */
 int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE])
 {
-  unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
-  unsigned char id_hash[crypto_hash_sha512_BYTES];
-  char salt[1024]; //need to find the propper value for this
   char seed[1 + crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES + crypto_box_curve25519xsalsa20poly1305_PUBLICKEYBYTES + 6 + 1]; // 6 for "sender" + 1 for null byte?
-  //char seed[512];
  
   //taken from meshms.c get_my_conversation_bundle()
   /* Find our private key */
   unsigned cn = 0, in = 0, kp = 0;
   if (!keyring_find_sid(keyring, &cn, &in, &kp, sender))
-	  return MESHMS_STATUS_SID_LOCKED;
+      return MESHMS_STATUS_SID_LOCKED;
 
   snprintf(seed, sizeof(seed), "%s%ssender", alloca_tohex(keyring->contexts[cn]->identities[in]->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES), alloca_tohex_sid_t(*recipient));
 
@@ -718,65 +750,17 @@ int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const
   (*concealed_sender) = (*sidp);
   DEBUGF("FSIDTX = %s", alloca_tohex_sid_t(*sidp));
 
-  /* Extract private key for FSIDTX */
-  if (!keyring_find_sid(keyring, &cn, &in, &kp, sidp))
-    return MESHMS_STATUS_SID_LOCKED;
-
-  /* Generate ID info for RSIDRX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, recipient->binary, keyring
-    ->contexts[cn]
-    ->identities[in]
-    ->keypairs[kp]->private_key);
-  assert(nm_bytes_id != NULL);
-  snprintf(salt, sizeof(salt), "%s%sidentification", alloca_tohex_sid_t(*sidp), alloca_tohex_rhizome_bid_t(*bid));   //fsidtx_public + Bundle ID + "id"
-  bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
-  crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
-
-  /* Encrypt RSIDTX by XORing with ID shared secret */
-  unsigned char crypted_sid[SID_SIZE];
-  unsigned i;
-    for(i=0; i<SID_SIZE; i++) {
-		crypted_sid[i] = id_hash[i] ^ sender->binary[i]; //binary is an array of chars the size of SID_SIZE
-  }
+  unsigned char crypted_sid[32];
+  
+  xor_csender(sidp, recipient, bid, sidp, sender->binary, crypted_sid);
 
   bcopy(crypted_sid, *sender_crypted_sid, sizeof(*sender_crypted_sid));
-
-  DEBUGF("Encrypted Serval ID = %s", alloca_tohex(crypted_sid, SID_SIZE));
-
 
   return 0;
 }
 
-int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, sid_t *decrypted_sender)
+int decrypt_concealed_sender(const rhizome_manifest *m, sid_t *decrypted_sender)
 {
-
-  unsigned char id_hash[crypto_hash_sha512_BYTES]; //need to set these
-
-  unsigned char nm_bytes_id[1024]; //1024 and not crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES to just be safe with overflows
-  char salt[1024]; //need to find the propper value for this
-
-  /* Find our private key associated with our SID*/
-  unsigned cn = 0, in = 0, kp = 0;
-  if (!keyring_find_sid(keyring, &cn, &in, &kp, &m->sender))
-    return MESHMS_STATUS_SID_LOCKED;
-
-  /* Generate the shared secret with FSIDTX */
-  crypto_box_curve25519xsalsa20poly1305_beforenm(nm_bytes_id, m->csenderPublic.binary, keyring
-    ->contexts[cn]
-    ->identities[in]
-    ->keypairs[kp]->private_key);
-
-  /* Generate id hash salt value */
-  snprintf(salt, sizeof(salt), "%s%sidentification",alloca_tohex_sid_t(m->csenderPublic), alloca_tohex_rhizome_bid_t(m->cryptoSignPublic));
-
-  /* Hash combined shared secret and salt and use to decrypt sid */
-  bcopy(salt, nm_bytes_id + crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES, sizeof(nm_bytes_id) - crypto_box_curve25519xsalsa20poly1305_BEFORENMBYTES); //security issue using sizeof salt here? Should limit it somehow...
-  crypto_hash_sha512(id_hash, nm_bytes_id, sizeof(nm_bytes_id)); //nm_bytes is 32 bytes + salt of 67 bytes (32 +32 +3)
-
-  unsigned i;
-
-  for(i=0; i<SID_SIZE; i++) {
-    decrypted_sender->binary[i] = id_hash[i] ^ m->csender[i];
-  }
+  xor_csender(&m->recipient, &m->csenderPublic, &m->cryptoSignPublic, &m->csenderPublic, m->csender, decrypted_sender->binary);
   return 0;
 }

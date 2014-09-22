@@ -864,7 +864,7 @@ int overlay_mdp_service_rhizome_sync(struct internal_mdp_header *header, struct 
 void rhizome_sync_status();
 
 int generate_concealed_sender(const sid_t *sender, const sid_t *recipient, const rhizome_bid_t *bid, keyring_file *keyring, sid_t *concealed_sender, unsigned char (*sender_crypted_sid)[SID_SIZE]);
-int decrypt_concealed_sender(const rhizome_manifest *m, keyring_file *keyring, sid_t *decrypted_sender);
+int decrypt_concealed_sender(const rhizome_manifest *m, sid_t *decrypted_sender);
 
 DECLARE_ALARM(rhizome_fetch_status);
 #endif //__SERVAL_DNA__RHIZOME_H
