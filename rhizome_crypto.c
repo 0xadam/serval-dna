@@ -611,28 +611,47 @@ int rhizome_derive_payload_key(rhizome_manifest *m)
 {
   assert(m->payloadEncryption == PAYLOAD_ENCRYPTED);
   unsigned char hash[crypto_hash_sha512_BYTES];
+  
+  sid_t sender;
+  // No sender concealment
+  if (m->has_sender)
+  {
+    if(config.debug.rhizome)
+      DEBUGF("Sender of payload is not concealed");
+    sender = m->sender;
+  } else if (&m->author) // Sender concealed, but the sender is us
+  {
+    if(config.debug.rhizome)
+      DEBUGF("We are the sender of this payload");
+    sender = m->author;
+  } else if (m->has_csender) { // Sender is concealed and we are recipient
+    if(config.debug.rhizome)
+      DEBUGF("We are the recipient of this payload");
+    decrypt_concealed_sender(m, keyring, &sender);
+  } 
+  
   if (m->has_sender && m->has_recipient) {
     unsigned char *nm_bytes=NULL;
     unsigned cn=0, in=0, kp=0;
-    if (!keyring_find_sid(keyring, &cn, &in, &kp, &m->sender)){
+    if (!keyring_find_sid(keyring, &cn, &in, &kp, &sender)){
       cn=in=kp=0;
       if (!keyring_find_sid(keyring, &cn, &in, &kp, &m->recipient)){
 	WARNF("Neither sender=%s nor recipient=%s is in keyring",
-	    alloca_tohex_sid_t(m->sender),
+	    alloca_tohex_sid_t(sender),
 	    alloca_tohex_sid_t(m->recipient));
 	return 0;
       }
-      nm_bytes = keyring_get_nm_bytes(&m->recipient, &m->sender);
+      nm_bytes = keyring_get_nm_bytes(&m->recipient, &sender);
       if (config.debug.rhizome)
 	DEBUGF("derived payload key from recipient=%s* to sender=%s*",
 	      alloca_tohex_sid_t_trunc(m->recipient, 7),
-	      alloca_tohex_sid_t_trunc(m->sender, 7)
+	      alloca_tohex_sid_t_trunc(sender, 7)
 	    );
     }else{
-      nm_bytes = keyring_get_nm_bytes(&m->sender, &m->recipient);
+      nm_bytes = keyring_get_nm_bytes(&sender, &m->recipient);
       if (config.debug.rhizome)
 	DEBUGF("derived payload key from sender=%s* to recipient=%s*",
-	      alloca_tohex_sid_t_trunc(m->sender, 7),
+	      alloca_tohex_sid_t_trunc(sender, 7),
 	      alloca_tohex_sid_t_trunc(m->recipient, 7)
 	    );
     }
