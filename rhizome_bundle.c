@@ -878,8 +878,8 @@ const char *rhizome_manifest_validate_reason(rhizome_manifest *m)
   ) {
     if (!m->has_recipient)
       m->malformed = "Manifest missing 'recipient' field";
-    else if (!m->has_sender)
-      m->malformed = "Manifest missing 'sender' field";
+    else if (!m->has_sender && !m->has_csender)
+      m->malformed = "Manifest missing 'sender' or 'csender' field";
   }
   else if (!rhizome_str_is_manifest_service(m->service))
     m->malformed = "Manifest invalid 'service' field";
