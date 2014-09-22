@@ -220,6 +220,11 @@ static int create_ply(const sid_t *my_sid, struct meshms_conversations *conv, rh
 	alloca_tohex(keyring->contexts[cn]->identities[in]
 	->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES));
 
+  // Deterministically generate bundle id from seed
+  rhizome_get_bundle_from_seed(m, seed, my_sid);
+  if (m->authorship != ANONYMOUS)
+    rhizome_manifest_add_bundle_key(m); // set the BK field
+
   if (rhizome_fill_manifest(m, NULL, NULL))
     return -1;
   assert(m->haveSecret);
