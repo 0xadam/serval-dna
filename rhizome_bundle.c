@@ -756,15 +756,12 @@ int rhizome_manifest_parse(rhizome_manifest *m)
   status = FIELD_MALFORMED;
     }
     else if (strcasecmp(label, "csender") == 0) {
-      if (strlen((char *)&m->csender) == SID_SIZE) {
-  assert(!m->has_csender);
-  status = FIELD_OK;
-  bcopy(value, m->csender, SID_SIZE);
-  m->has_csender = 1;
-  if (config.debug.rhizome_manifest)
-    DEBUGF("PARSE manifest[%d].csender = %s", m->manifest_record_number, alloca_tohex(m->csender, SID_SIZE));
-      } else
-  status = FIELD_MALFORMED;
+      assert(!m->has_csender);
+      status = FIELD_OK;
+      bcopy(value, m->csender, SID_SIZE);
+      m->has_csender = 1;
+      if (config.debug.rhizome_manifest)
+        DEBUGF("PARSE manifest[%d].csender = %s", m->manifest_record_number, alloca_tohex(m->csender, SID_SIZE));
     }
     else if (strcasecmp(label, "name") == 0) {
       status = FIELD_OK;
