@@ -110,6 +110,21 @@ static struct meshms_conversations *add_conv(struct meshms_conversations **conv,
   return *ptr;
 }
 
+static int generate_ply_seed(const sid_t *my_sid, const sid_t *their_sid, char (*seed)[1024])
+{
+    /* Find our private key */
+  unsigned cn=0, in=0, kp=0;
+  if (!keyring_find_sid(keyring,&cn,&in,&kp, my_sid))
+    return MESHMS_STATUS_SID_LOCKED;
+
+  snprintf(*seed, sizeof(*seed),
+    "%s%scomparability", alloca_tohex_sid_t(*their_sid),
+  alloca_tohex(keyring->contexts[cn]->identities[in]
+  ->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES));
+
+  return 0;
+}
+
 // find matching conversations
 // if their_sid == my_sid, return all conversations with any recipient
 static enum meshms_status get_database_conversations(const sid_t *my_sid, const sid_t *their_sid, struct meshms_conversations **conv)
@@ -209,18 +224,10 @@ static int create_ply(const sid_t *my_sid, struct meshms_conversations *conv, rh
   rhizome_manifest_set_filesize(m, 0);
   rhizome_manifest_set_tail(m, 0);
 
-  /* Find our private key */
-  unsigned cn=0, in=0, kp=0;
-  if (!keyring_find_sid(keyring,&cn,&in,&kp,my_sid))
-    return MESHMS_STATUS_SID_LOCKED;
-
-  char seed[1024];
-  snprintf(seed, sizeof(seed),
-    "%s%scomparability", alloca_tohex_sid_t(conv->them),
-	alloca_tohex(keyring->contexts[cn]->identities[in]
-	->keypairs[kp]->private_key, crypto_box_curve25519xsalsa20poly1305_SECRETKEYBYTES));
-
   // Deterministically generate bundle id from seed
+  char seed[1024];
+  generate_ply_seed(my_sid, &conv->them,&seed);
+
   rhizome_get_bundle_from_seed(m, seed, my_sid);
   if (m->authorship != ANONYMOUS)
     rhizome_manifest_add_bundle_key(m); // set the BK field
